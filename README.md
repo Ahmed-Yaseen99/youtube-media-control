@@ -73,4 +73,4 @@ An agent (Hermes, opencode, whatever) can run this over SSH, parse stdout for `A
 
 ## License
 
-MIT. See LICENSE.
+MIT. See [LICENSE](https://github.com/Ahmed-Yaseen99/youtube-media-control/blob/main/LICENSE).
