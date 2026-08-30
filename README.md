@@ -1,5 +1,7 @@
 # youtube-media-control
 
+![demo](demo.gif)
+
 Deterministic keyboard control of YouTube and other media on Windows, built for AI agents. One command, one action, zero ML decisions. Made to be called from a script, a macro pad, or an agent loop.
 
 ## Why this exists

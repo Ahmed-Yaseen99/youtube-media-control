@@ -126,7 +126,7 @@ def find_browser_windows(browser_exes):
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         name = process_name(pid.value)
-        if name and name in browser_exes:
+        if name and any(name.endswith(exe) for exe in browser_exes):
             if user32.IsWindowVisible(hwnd):
                 length = user32.GetWindowTextLengthW(hwnd)
                 if length > 0:
