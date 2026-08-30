@@ -1,42 +1,74 @@
 # youtube-media-control
 
-Deterministic keyboard control of a running Firefox + YouTube playback on Windows — zero ML decisions, made for AI agents calling it as a single command.
+Deterministic keyboard control of YouTube and other media on Windows, built for AI agents. One command, one action, zero ML decisions. Made to be called from a script, a macro pad, or an agent loop.
 
-## What it does
+## Why this exists
 
-One command, one action. Never writes code, never browses, never asks anything.
+Media keys exist on every keyboard, and YouTube shortcuts exist on every tab. Getting an *automation* to press them reliably is the hard part:
 
-- **Global actions** (play/pause, next, prev, stop, volume) use the **Windows global media keys** via `keybd_event` — routed by Windows to the active media session. No foreground needed, immune to focus stealing.
-- **Focused actions** (mute `m`, fullscreen `f`, rewind `j`, forward `l`) send YouTube's page shortcuts and force foreground with the full Win32 recipe (AttachThreadInput + topmost SetWindowPos + simulated ALT input + SetForegroundWindow ×3) and **verify** focus succeeded — never claims success it can't prove.
-- **`loop`** toggles the video's `loop` property via Firefox BiDi JS injection (no focus needed).
+- Global actions (play/pause, next, prev, volume) go through the **Windows system media session**, the same path as hardware media buttons. They work no matter which app is playing, no foreground required, and focus stealing can't block them.
+- Page shortcuts (mute, fullscreen, seek) need the browser window focused. This script forces focus with the full Win32 recipe (AttachThreadInput, topmost SetWindowPos, simulated ALT input, SetForegroundWindow, then verify) and **refuses to claim success it can't verify**. If focus fails, the key is not sent and exit code 3 tells you why.
 
-Finds the Firefox window by process name (`EnumWindows` + `QueryFullProcessImageName`), not by title guessing — picks the most recently used window.
+It finds the browser window by process (EnumWindows + QueryFullProcessImageName), not by guessing titles. It never writes code, never browses, never asks anything.
 
-## Usage
+## Quick start
 
 ```bash
-python youtube_media_control.py [action]
+python youtube_media_control.py playpause   # any browser, any app
+python youtube_media_control.py mute        # focuses the browser first, then m
+python youtube_media_control.py loop        # Firefox: toggles video.loop via BiDi
+python youtube_media_control.py next --browser chrome
 ```
 
-| Action | Key | Focus needed? |
-|---|---|---|
-| `playpause` / `pause` | Media play/pause | No |
-| `next` / `prev` / `stop` | Media next/prev/stop | No |
-| `volumeup` / `volumedown` | Media volume | No |
-| `mute` | `m` | Yes |
-| `fullscreen` | `f` | Yes |
-| `rewind10` | `j` | Yes |
-| `forward10` | `l` | Yes |
-| `loop` | BiDi JS | No |
+## Actions
 
-Exit codes: `0` OK, `2` Firefox not running / BiDi unavailable, `3` focus failed (focused actions only — key NOT sent), `4` unknown action.
+| Action | Key | Focus needed? | Any browser? |
+|---|---|---|---|
+| `playpause` / `pause` | Media play/pause | No | Yes (any app even) |
+| `next` / `prev` / `stop` | Media next/prev/stop | No | Yes |
+| `volumeup` / `volumedown` | Media volume | No | Yes |
+| `mute` | `m` | Yes | Chromium + Firefox |
+| `fullscreen` | `f` | Yes | Chromium + Firefox |
+| `rewind10` | `j` | Yes | Chromium + Firefox |
+| `forward10` | `l` | Yes | Chromium + Firefox |
+| `loop` | JS via BiDi | No | Firefox only |
+
+`--browser` accepts `firefox`, `chrome`, `edge`, `brave`, `opera`, `vivaldi`, `chromium` (try `ff` / `msedge` / `google-chrome` as aliases). Default: first supported browser found.
+
+## Built for agents
+
+Deterministic output, parseable exit codes, no hidden state:
+
+```
+WINDOW: "Rick Astley - Never Gonna Give You Up (Official Music Video)"  (stderr)
+ACTION: mute
+KEY: m
+FOCUS: OK
+OK
+```
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Action sent |
+| `2` | No supported browser running, or BiDi unavailable (loop) |
+| `3` | Focus failed: key **not** sent (focused actions only) |
+| `4` | Unknown action |
+
+An agent (Hermes, opencode, whatever) can run this over SSH, parse stdout for `ACTION`/`RESULT`/`OK`, and trust that `FOCUS: FAIL` means nothing was pressed.
 
 ## Requirements
 
-- Windows
-- Firefox running (with the remote agent port `9222` enabled for `loop`)
-- `pyautogui` for focused actions; `websocket-client` for `loop`
+- Windows (7–11; uses Win32 APIs directly via ctypes)
+- A supported browser running; Firefox with the remote agent port `9222` enabled for `loop`
+- `pyautogui` for focused actions, `websocket-client` for `loop`
 
 ## Design notes
 
-Every path prints an `ACTION:` / `RESULT:` / `OK` or error to stdout, making it deterministic for agents to parse. Global-key actions deliberately avoid focus games — Windows media keys are the same path as hardware media buttons.
+- Global-key actions deliberately avoid focus games. Windows routes media keys to the active media session, so the script never touches window state for them.
+- The focus recipe is in one function with verification loops. If Windows changes its focus rules, there's exactly one place to fix.
+- Every path prints `ACTION:` / `RESULT:` / `OK` or an error line, so output is stable for agents to parse.
+- `loop` uses Firefox BiDi because that's the only standardized remote protocol here; Chromium equivalents need a debug port, which is a bigger ask than a convenience toggle is worth.
+
+## License
+
+MIT. See LICENSE.
